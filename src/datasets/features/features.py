@@ -532,6 +532,31 @@ class _ArrayXD:
 
 
 @dataclass
+class Array1D(_ArrayXD):
+    """Create a two-dimensional array.
+
+    Args:
+        shape (`tuple`):
+            The size of each dimension.
+        dtype (`str`):
+            The value of the data type.
+
+    Example:
+
+    ```py
+    >>> from datasets import Features
+    >>> features = Features({'x': Array2D(shape=(1, 3), dtype='int32')})
+    ```
+    """
+
+    shape: tuple
+    dtype: str
+    id: Optional[str] = None
+    # Automatically constructed
+    _type: str = field(default="Array1D", init=False, repr=False)
+
+
+@dataclass
 class Array2D(_ArrayXD):
     """Create a two-dimensional array.
 
@@ -635,8 +660,8 @@ class _ArrayXDExtensionType(pa.PyExtensionType):
     ndims: Optional[int] = None
 
     def __init__(self, shape: tuple, dtype: str):
-        if self.ndims is None or self.ndims <= 1:
-            raise ValueError("You must instantiate an array type with a value for dim that is > 1")
+        if self.ndims is None or self.ndims < 1:
+            raise ValueError("You must instantiate an array type with a value for dim that is > 0")
         if len(shape) != self.ndims:
             raise ValueError(f"shape={shape} and ndims={self.ndims} don't match")
         for dim in range(1, self.ndims):
@@ -670,6 +695,8 @@ class _ArrayXDExtensionType(pa.PyExtensionType):
     def to_pandas_dtype(self):
         return PandasArrayExtensionDtype(self.value_type)
 
+class Array1DExtensionType(_ArrayXDExtensionType):
+    ndims = 1
 
 class Array2DExtensionType(_ArrayXDExtensionType):
     ndims = 2
@@ -1150,6 +1177,7 @@ FeatureType = Union[
     Translation,
     TranslationVariableLanguages,
     Sequence,
+    Array1D,
     Array2D,
     Array3D,
     Array4D,
@@ -1373,7 +1401,7 @@ def generate_from_arrow_type(pa_type: pa.DataType) -> FeatureType:
             return [feature]
         return Sequence(feature=feature)
     elif isinstance(pa_type, _ArrayXDExtensionType):
-        array_feature = [None, None, Array2D, Array3D, Array4D, Array5D][pa_type.ndims]
+        array_feature = [None, Array1D, Array2D, Array3D, Array4D, Array5D][pa_type.ndims]
         return array_feature(shape=pa_type.shape, dtype=pa_type.value_type)
     elif isinstance(pa_type, pa.DictionaryType):
         raise NotImplementedError  # TODO(thom) this will need access to the dictionary as well (for labels). I.e. to the py_table
